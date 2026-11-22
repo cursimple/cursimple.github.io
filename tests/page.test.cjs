@@ -252,3 +252,23 @@ test('公告安全 URL 保留相对路径、查询参数和图片，Markdown 不
   assert.ok(html.includes('src="https://cdn.jsdelivr.net/gh/owner/repo@main/shot.png"'));
   assert.doesNotMatch(html, /amp;amp;|href="[^"\n]*<strong>/);
 });
+
+test('图片加载失败时依次改走 jsDelivr 镜像，镜像用尽后不再重试，站外图片不改写', async () => {
+  const page = await runPage({});
+  const img = { tagName: 'IMG', dataset: {}, src: 'http://localhost/cursimple-app/assets/shots/week.webp' };
+  const fail = () => page.document.dispatchEvent({ type: 'error', target: img });
+  fail();
+  assert.equal(img.src, 'https://cdn.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/week.webp');
+  fail();
+  assert.equal(img.src, 'https://fastly.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/week.webp');
+  fail();
+  assert.equal(img.src, 'https://gcore.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/week.webp');
+  fail();
+  assert.equal(img.src, 'https://gcore.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/week.webp');
+  const external = { tagName: 'IMG', dataset: {}, src: 'https://example.com/a.png' };
+  page.document.dispatchEvent({ type: 'error', target: external });
+  assert.equal(external.src, 'https://example.com/a.png');
+  const notImage = { tagName: 'DIV', dataset: {}, src: 'http://localhost/cursimple-app/assets/x.png' };
+  page.document.dispatchEvent({ type: 'error', target: notImage });
+  assert.equal(notImage.src, 'http://localhost/cursimple-app/assets/x.png');
+});

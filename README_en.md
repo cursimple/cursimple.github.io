@@ -2,7 +2,9 @@
 
 [中文](README.md)
 
-The static site is deployed from `site/` by `.github/workflows/pages.yml`, independently of Android builds.
+The static site lives in its own repository, `cursimple/cursimple.github.io`. Pushing to `main` runs `.github/workflows/pages.yml`, which verifies and publishes it to GitHub Pages (`https://cursimple.github.io/`), independently of Android builds. Versions, APKs and the `update-feed` branch still come from the app repository, `cursimple/cursimple-app`.
+
+The `pre` branch Netlify preview is handled by `.github/workflows/site-preview.yml` and needs the repository secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID`.
 
 ## Plugin and component entry points
 
@@ -17,6 +19,8 @@ Support `zh-CN`, `zh-TW` and `en` with identical semantic dictionary keys in `i1
 Use `data-i18n` for text-only nodes. For elements containing icons or links, mark a text child to preserve interactions. Alternative text, accessible labels and metadata use `data-i18n-alt`, `data-i18n-aria-label` and `data-i18n-content`. Dynamic strings use `SiteI18n.t()`; dates use `formatDate()`.
 
 ## Downloads
+
+Page images load from GitHub Pages first. When an image fails or stalls for 8 seconds, it is retried through three jsDelivr hosts (`cdn`, `fastly`, `gcore`) serving the same path from this repository's `main` branch. Only images under `assets/` are rewritten, never external ones, and release-note images are covered too.
 
 Download buttons use the China mirror by default: the page starts with the first mirror, then switches to whichever mirror first returns the real `update.json`; rate-limited or failing mirrors are never chosen. Choosing “GitHub direct” is remembered. Only mirrors verified to serve the APK and allow cross-origin probes belong in the list.
 
@@ -37,12 +41,12 @@ Relative images resolve against each Markdown file. Missing local notes fall bac
 Run from the repository root:
 
 ```sh
-node --check site/i18n.js
-node --check site/releases.js
-node --check site/main.js
-node --test site/tests/*.test.cjs
-node site/check-links.cjs
-python3 -m http.server 8892 --bind 127.0.0.1 --directory site
+node --check i18n.js
+node --check releases.js
+node --check main.js
+node --test tests/*.test.cjs
+node check-links.cjs
+python3 -m http.server 8892 --bind 127.0.0.1 --directory .
 ```
 
 Check language persistence, mobile navigation, download choices and announcement paging. Every arrow press updates the current page and indicator immediately; manual scrolling keeps them synchronized. Tests cover locale priority, dictionary completeness, offline fallback and competing requests.

@@ -102,16 +102,53 @@
     $$('.reveal').forEach((el) => el.classList.add('in'));
   }
 
+  // Site images ship with the page. When one fails to load (GitHub Pages is unreliable in some regions),
+  // retry through jsDelivr mirrors of this site's repository, one mirror per failure.
+  const SITE_REPO = 'cursimple/cursimple.github.io';
+  const IMAGE_MIRRORS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'gcore.jsdelivr.net'].map((host) => `https://${host}/gh/${SITE_REPO}@main/`);
+  const sitePath = (src) => {
+    try {
+      const abs = new URL(src, document.baseURI).href;
+      const base = new URL('./', document.baseURI).href;
+      const rel = abs.startsWith(base) ? abs.slice(base.length) : IMAGE_MIRRORS.map((m) => abs.startsWith(m) && abs.slice(m.length)).find(Boolean);
+      const path = rel && rel.split(/[?#]/)[0];
+      return /^assets\//.test(path || '') ? path : null;
+    } catch { return null; }
+  };
+  function retryImage(img) {
+    const tried = Number(img.dataset.mirror || 0);
+    const path = sitePath(img.currentSrc || img.src);
+    if (!path || tried >= IMAGE_MIRRORS.length) return false;
+    img.dataset.mirror = String(tried + 1);
+    img.src = IMAGE_MIRRORS[tried] + path;
+    return true;
+  }
+  function loadImage(src, onload, onfail) {
+    const img = new Image();
+    let done = false;
+    let timer = 0;
+    const finish = (cb) => { if (done) return; done = true; clearTimeout(timer); if (cb) cb(img); };
+    // A stalled request (no error, no data) also moves on to the next mirror.
+    const stall = () => {
+      if (done || img.complete) return;
+      if (retryImage(img)) timer = setTimeout(stall, 8000);
+      else finish(onfail);
+    };
+    timer = setTimeout(stall, 8000);
+    img.onload = () => finish(onload);
+    img.onerror = () => { if (!retryImage(img)) finish(onfail); };
+    img.src = src;
+  }
+  document.addEventListener('error', (e) => { if (e.target && e.target.tagName === 'IMG') retryImage(e.target); }, true);
+
   const shot = $('#scheduleShot');
   $$('.tabs button').forEach((btn) => btn.addEventListener('click', () => {
     if (btn.classList.contains('on')) return;
     $$('.tabs button').forEach((b) => b.classList.toggle('on', b === btn));
     shot.classList.add('fade');
-    const next = new Image();
-    next.onload = () => { shot.src = next.src; shot.alt = btn.textContent; shot.classList.remove('fade'); };
-    next.src = btn.dataset.shot;
+    loadImage(btn.dataset.shot, (img) => { shot.src = img.src; shot.alt = btn.textContent; shot.classList.remove('fade'); }, () => shot.classList.remove('fade'));
   }));
-  addEventListener('load', () => $$('.tabs button').forEach((b) => { new Image().src = b.dataset.shot; }));
+  addEventListener('load', () => $$('.tabs button').forEach((b) => loadImage(b.dataset.shot)));
 
   const lightbox = $('#lightbox');
   const lbImg = $('img', lightbox);

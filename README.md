@@ -2,7 +2,9 @@
 
 [English](README_en.md)
 
-官网是静态站点，`.github/workflows/pages.yml` 验证后将 `site/` 发布到 GitHub Pages，无需构建 Android。
+官网是独立仓库 `cursimple/cursimple.github.io` 中的静态站点，推送到 `main` 后由 `.github/workflows/pages.yml` 验证并发布到 GitHub Pages（`https://cursimple.github.io/`），无需构建 Android。版本、APK 与 `update-feed` 仍来自应用仓库 `cursimple/cursimple-app`。
+
+`pre` 分支的 Netlify 预览由 `.github/workflows/site-preview.yml` 负责，需要仓库密钥 `NETLIFY_AUTH_TOKEN` 与 `NETLIFY_SITE_ID`。
 
 ## 插件与组件入口
 
@@ -18,6 +20,8 @@
 
 ## 下载
 
+页面图片先读 GitHub Pages 本站地址；某张图片加载失败或 8 秒无响应时，依次改走 jsDelivr 的三个节点（`cdn`、`fastly`、`gcore`）上本仓库 `main` 分支的同一路径，只处理 `assets/` 下的图片，站外图片不改写。更新日志里的图片同样适用。
+
 下载按钮默认走国内加速直链：页面先用第一个镜像，再测速换成最先返回真实 `update.json` 的镜像，限流或报错的镜像不会被选中。用户切到「GitHub 直连」后会记住选择。镜像列表只放实测能下载 APK 且允许跨域测速的地址。
 
 ## 公告
@@ -31,12 +35,12 @@
 在仓库根目录执行：
 
 ```sh
-node --check site/i18n.js
-node --check site/releases.js
-node --check site/main.js
-node --test site/tests/*.test.cjs
-node site/check-links.cjs
-python3 -m http.server 8892 --bind 127.0.0.1 --directory site
+node --check i18n.js
+node --check releases.js
+node --check main.js
+node --test tests/*.test.cjs
+node check-links.cjs
+python3 -m http.server 8892 --bind 127.0.0.1 --directory .
 ```
 
 检查默认中文、手动选择及刷新保留、手机菜单、下载架构和公告翻页。测试覆盖语言优先级、字典完整性、断网回退和竞争请求。
