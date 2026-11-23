@@ -39,7 +39,7 @@ async function runPage({ stable, beta, api, order = [], language = 'zh-CN', note
   const requests = [];
   const handlers = new Map();
   const document = {
-    baseURI: 'http://localhost/cursimple-app/', documentElement: element(), body: element(),
+    baseURI: 'http://localhost/', documentElement: element(), body: element(),
     querySelector: get, querySelectorAll: (s) => lists[s] || [],
     addEventListener(name, callback) { handlers.set(name, callback); },
     dispatchEvent(event) { handlers.get(event.type)?.(event); },
@@ -48,7 +48,7 @@ async function runPage({ stable, beta, api, order = [], language = 'zh-CN', note
     requests.push(url);
     if (notesFetch && /release-notes\//.test(url)) return notesFetch(url);
     if (mirrorFetch && /\/update\.json$/.test(url)) return mirrorFetch(url);
-    if (/^release-notes\/v0\.8\.1(?:\.en|\.zh-TW)?\.md$/.test(url)) return Promise.resolve({ ok: true, text: async () => fs.readFileSync(path.join(__dirname, '..', url), 'utf8') });
+    if (/^release-notes\/v0\.8\.2(?:\.en|\.zh-TW)?\.md$/.test(url)) return Promise.resolve({ ok: true, text: async () => fs.readFileSync(path.join(__dirname, '..', url), 'utf8') });
     const key = url.includes('stable.json') ? 'stable' : url.includes('beta.json') ? 'beta' : url.startsWith('https://api.github.com/') ? 'api' : null;
     if (!key) return Promise.reject(new Error('offline'));
     return new Promise((resolve, reject) => pending.set(key, () => {
@@ -57,7 +57,7 @@ async function runPage({ stable, beta, api, order = [], language = 'zh-CN', note
       else resolve({ ok: true, json: async () => data });
     }));
   };
-  const location = { href: `http://localhost/cursimple-app/?lang=${language}#changelog`, hash: '#changelog' };
+  const location = { href: `http://localhost/?lang=${language}#changelog`, hash: '#changelog' };
   const context = vm.createContext({
     SiteReleases, document, window: {}, navigator: { userAgent: 'Node', languages: ['zh-CN'] },
     localStorage: { getItem: (k) => saved[k] ?? null, setItem: (k, v) => { saved[k] = String(v); } },
@@ -71,19 +71,19 @@ async function runPage({ stable, beta, api, order = [], language = 'zh-CN', note
     await new Promise(setImmediate);
   }
   await new Promise(setImmediate);
-  return { get, lists, requests, i18n: context.SiteI18n, document, saved };
+  return { get, lists, requests, i18n: context.SiteI18n, document, saved, window: context.window };
 }
 
 test('真实页面脚本在 feed/API 断网时仍显示测试版并加载本地公告图', async () => {
   const page = await runPage({});
-  assert.equal(page.lists['[data-ver]'][0].textContent, 'v0.8.1');
+  assert.equal(page.lists['[data-ver]'][0].textContent, 'v0.8.2');
   assert.equal(page.lists['[data-channel-label]'][0].textContent, '最新测试版');
   assert.equal(page.get('[data-channel="stable"]').innerHTML, '最新正式版：暂无正式版');
   assert.equal(page.get('[data-date]').textContent, '');
-  for (const link of page.lists['[data-dl]']) assert.ok(link.href.includes('/releases/download/v0.8.1/'));
+  for (const link of page.lists['[data-dl]']) assert.ok(link.href.includes('/releases/download/v0.8.2/'));
   const slides = page.get('#clSlides').innerHTML;
-  assert.equal((slides.match(/http:\/\/localhost\/cursimple-app\/assets\/shots\//g) || []).length, 7);
-  assert.ok(slides.includes('学期合并'));
+  assert.equal((slides.match(/http:\/\/localhost\/assets\/shots\//g) || []).length, 9);
+  assert.ok(slides.includes('从教务系统导课'));
   assert.ok(!page.requests.some((url) => url.includes('/releases/latest')));
 });
 
@@ -91,16 +91,16 @@ test('API 与 feed 不同到达顺序都不混用 0.7.4 的日期、包大小和
   for (const order of [['api', 'stable', 'beta'], ['beta', 'stable', 'api']]) {
     const page = await runPage({
       stable: { tagName: 'v0.7.4', versionCode: 30, prerelease: false },
-      beta: { tagName: 'v0.8.1', versionCode: 39, prerelease: true },
+      beta: { tagName: 'v0.8.2', versionCode: 43, prerelease: true },
       api: [{ tag_name: 'v0.7.4', prerelease: false, published_at: '2026-09-01T00:00:00Z', body: '这是旧公告', assets: [{ name: 'CurSimple-arm64-v8a.apk', size: 1000000, browser_download_url: 'old.apk' }] }],
       order,
     });
-    assert.equal(page.lists['[data-ver]'][0].textContent, 'v0.8.1');
+    assert.equal(page.lists['[data-ver]'][0].textContent, 'v0.8.2');
     assert.equal(page.get('[data-channel="stable"]').innerHTML, '最新正式版：暂无正式版');
     assert.equal(page.get('[data-date]').textContent, '');
     assert.equal(page.lists['[data-size]'][0].textContent, '大小待获取');
     assert.ok(!page.get('#clSlides').innerHTML.includes('这是旧公告'));
-    for (const link of page.lists['[data-dl]']) assert.ok(link.href.includes('/releases/download/v0.8.1/'));
+    for (const link of page.lists['[data-dl]']) assert.ok(link.href.includes('/releases/download/v0.8.2/'));
   }
 });
 
@@ -108,14 +108,14 @@ test('英文和繁体公告离线仍能加载，日期与下载文案使用所�
   for (const language of ['en', 'zh-TW']) {
     const page = await runPage({
       language,
-      api: [{ tag_name: 'v0.8.1', prerelease: true, published_at: '2026-10-15T00:00:00Z', assets: [] }],
+      api: [{ tag_name: 'v0.8.2', prerelease: true, published_at: '2026-11-01T12:00:00Z', assets: [] }],
     });
     assert.equal(page.document.documentElement.lang, language);
     assert.equal(page.lists['[data-channel-label]'][0].textContent, language === 'en' ? 'Latest beta' : '最新測試版');
-    assert.ok(page.get('[data-date]').textContent.includes(language === 'en' ? 'October' : '10月'));
+    assert.ok(page.get('[data-date]').textContent.includes(language === 'en' ? 'November' : '11月'));
     const slides = page.get('#clSlides').innerHTML;
-    assert.ok(slides.includes(language === 'en' ? 'Merge terms' : '學期合併'));
-    assert.equal((slides.match(/http:\/\/localhost\/cursimple-app\/assets\/shots\//g) || []).length, 7);
+    assert.ok(slides.includes(language === 'en' ? 'Import from your university' : '從教務系統匯入課表'));
+    assert.equal((slides.match(/http:\/\/localhost\/assets\/shots\//g) || []).length, 9);
     assert.equal(page.lists['[data-size]'][0].textContent, language === 'en' ? 'Size unavailable' : '大小待取得');
   }
 });
@@ -123,7 +123,7 @@ test('英文和繁体公告离线仍能加载，日期与下载文案使用所�
 test('快速切换语言时，迟到的英文公告不会覆盖繁体公告', async () => {
   let resolveEnglish;
   const page = await runPage({ notesFetch: (url) => {
-    if (url === 'release-notes/v0.8.1.en.md') return new Promise((resolve) => { resolveEnglish = resolve; });
+    if (url === 'release-notes/v0.8.2.en.md') return new Promise((resolve) => { resolveEnglish = resolve; });
     return Promise.resolve({ ok: true, text: async () => fs.readFileSync(path.join(__dirname, '..', url), 'utf8') });
   } });
   page.i18n.setLanguage('en');
@@ -139,7 +139,7 @@ test('快速切换语言时，迟到的英文公告不会覆盖繁体公告', as
 
 test('公告缺少翻译时显示原文提示，语言切回中文后提示消失', async () => {
   const page = await runPage({ language: 'en', notesFetch: (url) => {
-    if (url === 'release-notes/v0.8.1.md') return Promise.resolve({ ok: true, text: async () => fs.readFileSync(path.join(__dirname, '../release-notes/v0.8.1.md'), 'utf8') });
+    if (url === 'release-notes/v0.8.2.md') return Promise.resolve({ ok: true, text: async () => fs.readFileSync(path.join(__dirname, '../release-notes/v0.8.2.md'), 'utf8') });
     return Promise.reject(new Error('missing translation'));
   } });
   assert.ok(page.get('#clSlides').innerHTML.includes('The original text is shown below.'));
@@ -184,7 +184,7 @@ test('手势滚动到下一页的过程中，底部指示立即同步，无需�
   assert.equal(dots.children.findIndex((dot) => dot.classList.contains('on')), 3);
 });
 
-const APK = 'https://github.com/cursimple/cursimple-app/releases/download/v0.8.1/CurSimple-arm64-v8a.apk';
+const APK = 'https://github.com/cursimple/cursimple-app/releases/download/v0.8.2/CurSimple-arm64-v8a.apk';
 
 test('不分地区默认走国内加速直链，旧版保存的 GitHub 线路不再沿用', async () => {
   for (const saved of [{}, { 'dl-route': 'github' }]) {
@@ -199,7 +199,7 @@ test('不分地区默认走国内加速直链，旧版保存的 GitHub 线路不
 test('测速只认真正返回内容的镜像，限流或报错的镜像不会被选中', async () => {
   const page = await runPage({ mirrorFetch: (url) => {
     if (url.startsWith('https://gh-proxy.com/')) return Promise.resolve({ ok: false, status: 429, json: async () => ({}) });
-    if (url.startsWith('https://gh-proxy.org/')) return Promise.resolve({ ok: true, json: async () => ({ tagName: 'v0.8.1' }) });
+    if (url.startsWith('https://gh-proxy.org/')) return Promise.resolve({ ok: true, json: async () => ({ tagName: 'v0.8.2' }) });
     return new Promise(() => {});
   } });
   await new Promise(setImmediate);
@@ -246,7 +246,7 @@ test('公告安全 URL 保留相对路径、查询参数和图片，Markdown 不
   const page = await runPage({ notesFetch: async () => ({ ok: true, text: async () => md }) });
   const html = page.get('#clSlides').innerHTML;
   assert.ok(html.includes('href="https://example.com/a?x=1&amp;y=2"'));
-  assert.ok(html.includes('href="http://localhost/cursimple-app/help.html"'));
+  assert.ok(html.includes('href="http://localhost/help.html"'));
   assert.ok(html.includes('href="https://example.com/**safe**"'));
   assert.ok(html.includes('src="https://example.com/inline.png?x=1&amp;y=2" alt="quote&quot;alt"'));
   assert.ok(html.includes('src="https://cdn.jsdelivr.net/gh/owner/repo@main/shot.png"'));
@@ -255,7 +255,7 @@ test('公告安全 URL 保留相对路径、查询参数和图片，Markdown 不
 
 test('图片加载失败时依次改走 jsDelivr 镜像，镜像用尽后不再重试，站外图片不改写', async () => {
   const page = await runPage({});
-  const img = { tagName: 'IMG', dataset: {}, src: 'http://localhost/cursimple-app/assets/shots/week.webp' };
+  const img = { tagName: 'IMG', dataset: {}, src: 'http://localhost/assets/shots/week.webp' };
   const fail = () => page.document.dispatchEvent({ type: 'error', target: img });
   fail();
   assert.equal(img.src, 'https://cdn.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/week.webp');
@@ -268,7 +268,31 @@ test('图片加载失败时依次改走 jsDelivr 镜像，镜像用尽后不再�
   const external = { tagName: 'IMG', dataset: {}, src: 'https://example.com/a.png' };
   page.document.dispatchEvent({ type: 'error', target: external });
   assert.equal(external.src, 'https://example.com/a.png');
-  const notImage = { tagName: 'DIV', dataset: {}, src: 'http://localhost/cursimple-app/assets/x.png' };
+  const notImage = { tagName: 'DIV', dataset: {}, src: 'http://localhost/assets/x.png' };
   page.document.dispatchEvent({ type: 'error', target: notImage });
-  assert.equal(notImage.src, 'http://localhost/cursimple-app/assets/x.png');
+  assert.equal(notImage.src, 'http://localhost/assets/x.png');
+});
+
+test('请求卡住既不成功也不报错的图片，超时后同样依次改走镜像，加载完成后停止', async () => {
+  const page = await runPage({});
+  page.window.SiteImages.stallMs = 20;
+  const img = { tagName: 'IMG', dataset: {}, complete: false, src: 'http://localhost/assets/shots/day.webp' };
+  page.window.SiteImages.watch(img);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(img.src, 'https://cdn.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/day.webp');
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(img.src, 'https://fastly.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/day.webp');
+  img.complete = true;
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(img.src, 'https://fastly.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/day.webp');
+});
+
+test('脚本启动前就已加载失败的图片（错过 error 事件）会立刻改走镜像，加载成功的不动', async () => {
+  const page = await runPage({});
+  const failed = { tagName: 'IMG', dataset: {}, complete: true, naturalWidth: 0, src: 'http://localhost/assets/shots/zoom.webp' };
+  page.window.SiteImages.watch(failed);
+  assert.equal(failed.src, 'https://cdn.jsdelivr.net/gh/cursimple/cursimple.github.io@main/assets/shots/zoom.webp');
+  const ok = { tagName: 'IMG', dataset: {}, complete: true, naturalWidth: 540, src: 'http://localhost/assets/shots/zoom.webp' };
+  page.window.SiteImages.watch(ok);
+  assert.equal(ok.src, 'http://localhost/assets/shots/zoom.webp');
 });

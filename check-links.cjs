@@ -42,6 +42,6 @@ for (const name of ['index.html', 'main.js', 'releases.js']) {
 }
 const html = fs.readFileSync(path.join(site, 'index.html'), 'utf8');
 assert.ok(html.indexOf('src="releases.js"') < html.indexOf('src="main.js"'), '渠道模块须先于页面脚本加载');
-assert.ok(html.includes('最新测试版') && html.includes('暂无正式版'), '静态页面须包含正确渠道文案');
+assert.ok(html.includes('最新正式版') && html.includes('最新测试版'), '静态页面须包含正式版与测试版渠道文案');
 assert.equal(failures.length, 0, failures.join('\n'));
 console.log(`静态链接校验通过：${checked} 个本地资源与锚点；下载回退固定 tag。`);

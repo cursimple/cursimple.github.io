@@ -123,21 +123,43 @@
     img.src = IMAGE_MIRRORS[tried] + path;
     return true;
   }
+  // A request that neither errors nor finishes within stallMs moves on to the next mirror.
+  const imageGuard = { stallMs: 8000 };
+  window.SiteImages = imageGuard;
   function loadImage(src, onload, onfail) {
     const img = new Image();
     let done = false;
     let timer = 0;
     const finish = (cb) => { if (done) return; done = true; clearTimeout(timer); if (cb) cb(img); };
-    // A stalled request (no error, no data) also moves on to the next mirror.
     const stall = () => {
       if (done || img.complete) return;
-      if (retryImage(img)) timer = setTimeout(stall, 8000);
+      if (retryImage(img)) timer = setTimeout(stall, imageGuard.stallMs);
       else finish(onfail);
     };
-    timer = setTimeout(stall, 8000);
+    timer = setTimeout(stall, imageGuard.stallMs);
     img.onload = () => finish(onload);
     img.onerror = () => { if (!retryImage(img)) finish(onfail); };
     img.src = src;
+  }
+  // Same rule for page images, which never fire an error when the connection just hangs.
+  function watchImage(img) {
+    // The deferred script can run after an image has already failed, so its error event was missed.
+    if (img.complete && img.src && img.naturalWidth === 0) retryImage(img);
+    const check = () => {
+      if (img.complete) return;
+      if (retryImage(img)) setTimeout(check, imageGuard.stallMs);
+    };
+    setTimeout(check, imageGuard.stallMs);
+  }
+  imageGuard.watch = watchImage;
+  // Lazy images only start loading near the viewport, so their clock starts when they get there.
+  if ('IntersectionObserver' in window) {
+    const lazy = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { lazy.unobserve(e.target); watchImage(e.target); }
+    }, { rootMargin: '200px 0px' });
+    $$('img').forEach((img) => (img.loading === 'lazy' ? lazy.observe(img) : watchImage(img)));
+  } else {
+    $$('img').forEach(watchImage);
   }
   document.addEventListener('error', (e) => { if (e.target && e.target.tagName === 'IMG') retryImage(e.target); }, true);
 
