@@ -5,6 +5,7 @@
 })(globalThis, () => {
   const REPO = 'cursimple/cursimple-app';
   const CHANNEL_METADATA = {
+    stable: { tagName: 'v1.0.0', versionName: '1.0.0', versionCode: 46, prerelease: false, assets: [] },
     beta: { tagName: 'v0.8.2', versionName: '0.8.2', versionCode: 43, prerelease: true, assets: [] },
   };
   // Publisher correction marks legacy 0.7.4 metadata as prerelease.
